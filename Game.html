@@ -1,0 +1,861 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shadow Hunter RPG</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #10151d;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+canvas {
+  display: block;
+  cursor: crosshair;
+}
+
+#hud {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  width: 225px;
+  padding: 14px;
+  border: 1px solid #39485a;
+  border-radius: 12px;
+  background: #10151ddd;
+}
+
+h2 {
+  margin: 0 0 10px;
+  color: #67e8f9;
+  font-size: 19px;
+}
+
+.bar {
+  height: 11px;
+  margin: 5px 0 10px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #374151;
+}
+
+.fill {
+  height: 100%;
+  transition: width .1s;
+}
+
+#health { background: #ef4444; }
+#xp { background: #a78bfa; }
+
+#stats {
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+#powers {
+  margin-top: 8px;
+  color: #67e8f9;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+#help {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #10151ddd;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  align-items: center;
+  justify-content: center;
+  background: #080c14dd;
+  text-align: center;
+}
+
+.panel {
+  width: 90%;
+  max-width: 400px;
+  padding: 30px;
+  border: 1px solid #67e8f9;
+  border-radius: 18px;
+  background: #182231;
+}
+
+button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  background: #06b6d4;
+  color: #06131b;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover { background: #67e8f9; }
+
+#bossBar {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  width: min(360px, 50vw);
+  text-align: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+#bossHealth {
+  height: 12px;
+  margin-top: 5px;
+  border-radius: 8px;
+  background: #ef4444;
+  width: 100%;
+}
+
+#mobileControls {
+  display: none;
+  position: fixed;
+  bottom: 65px;
+  left: 12px;
+  right: 12px;
+  z-index: 3;
+  justify-content: space-between;
+  align-items: end;
+  pointer-events: none;
+}
+
+.pad, .actions {
+  pointer-events: auto;
+}
+
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, 43px);
+  grid-template-rows: repeat(3, 43px);
+  gap: 3px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 43px;
+  height: 43px;
+  border: 1px solid #64748b;
+  border-radius: 10px;
+  background: #334155dd;
+  color: white;
+  font-weight: bold;
+  user-select: none;
+  touch-action: none;
+}
+
+.actions .control {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+}
+
+@media (pointer: coarse) {
+  #mobileControls { display: flex; }
+  #help {
+    bottom: 8px;
+    font-size: 10px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div id="hud">
+  <h2>⚔ SHADOW HUNTER</h2>
+
+  <div>❤️ HP <span id="hpText">100 / 100</span></div>
+  <div class="bar">
+    <div class="fill" id="health" style="width:100%"></div>
+  </div>
+
+  <div>✨ Experience</div>
+  <div class="bar">
+    <div class="fill" id="xp" style="width:0%"></div>
+  </div>
+
+  <div id="stats">
+    Level: <span id="level">1</span><br>
+    Score: <span id="score">0</span><br>
+    Enemies defeated: <span id="kills">0</span>
+  </div>
+
+  <div id="powers">Active powers: None</div>
+</div>
+
+<div id="bossBar">
+  BOSS
+  <div class="bar">
+    <div id="bossHealth"></div>
+  </div>
+</div>
+
+<div id="help">
+  WASD: Move · Mouse: Aim · Click/Space: Shoot
+</div>
+
+<div id="mobileControls">
+  <div class="pad">
+    <div></div>
+    <div class="control" data-key="w">▲</div>
+    <div></div>
+    <div class="control" data-key="a">◀</div>
+    <div class="control" data-key="s">▼</div>
+    <div class="control" data-key="d">▶</div>
+    <div></div><div></div><div></div>
+  </div>
+  <div class="actions">
+    <div class="control" id="shootButton">FIRE</div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div class="panel">
+    <h1 id="result">GAME OVER</h1>
+    <p id="summary"></p>
+    <button onclick="restart()">PLAY AGAIN</button>
+  </div>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+}
+resize();
+addEventListener("resize", resize);
+
+const keys = {};
+const mouse = {
+  x: innerWidth / 2 + 100,
+  y: innerHeight / 2,
+  down: false
+};
+
+addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.code === "Space") e.preventDefault();
+});
+
+addEventListener("keyup", e => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+canvas.addEventListener("mousemove", e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+
+canvas.addEventListener("mousedown", e => {
+  if (e.button === 0) mouse.down = true;
+});
+
+addEventListener("mouseup", e => {
+  if (e.button === 0) mouse.down = false;
+});
+
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+// Mobile movement controls
+document.querySelectorAll("[data-key]").forEach(button => {
+  const key = button.dataset.key;
+
+  button.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    keys[key] = true;
+    button.setPointerCapture(e.pointerId);
+  });
+
+  const release = () => keys[key] = false;
+  button.addEventListener("pointerup", release);
+  button.addEventListener("pointercancel", release);
+  button.addEventListener("lostpointercapture", release);
+});
+
+const shootButton = document.getElementById("shootButton");
+
+shootButton.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  mouse.down = true;
+  shootButton.setPointerCapture(e.pointerId);
+});
+
+function stopMobileShoot() {
+  mouse.down = false;
+}
+
+shootButton.addEventListener("pointerup", stopMobileShoot);
+shootButton.addEventListener("pointercancel", stopMobileShoot);
+shootButton.addEventListener("lostpointercapture", stopMobileShoot);
+
+let player, bullets, enemies, particles, powerups;
+let powerTimers;
+let score, kills, level, xp, nextXP;
+let spawnTimer, shootTimer, running;
+let lastTime = 0;
+
+function restart() {
+  player = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    r: 16,
+    hp: 100,
+    maxHp: 100,
+    speed: 240,
+    invincible: 0,
+    bulletDamage: 1
+  };
+
+  bullets = [];
+  enemies = [];
+  particles = [];
+  powerups = [];
+
+  powerTimers = {
+    rapid: 0,
+    strong: 0,
+    shield: 0
+  };
+
+  score = 0;
+  kills = 0;
+  level = 1;
+  xp = 0;
+  nextXP = 100;
+  spawnTimer = 0;
+  shootTimer = 0;
+  running = true;
+
+  for (const key in keys) keys[key] = false;
+  mouse.down = false;
+
+  document.getElementById("overlay").style.display = "none";
+  lastTime = performance.now();
+}
+
+function spawnEnemy() {
+  const side = Math.floor(Math.random() * 4);
+  let x, y;
+
+  if (side === 0) {
+    x = Math.random() * canvas.width;
+    y = -30;
+  } else if (side === 1) {
+    x = canvas.width + 30;
+    y = Math.random() * canvas.height;
+  } else if (side === 2) {
+    x = Math.random() * canvas.width;
+    y = canvas.height + 30;
+  } else {
+    x = -30;
+    y = Math.random() * canvas.height;
+  }
+
+  const roll = Math.random();
+  let type;
+
+  if (roll < 0.04 && level >= 3) {
+    type = "boss";
+  } else if (roll < 0.28) {
+    type = "tank";
+  } else if (roll < 0.58) {
+    type = "fast";
+  } else {
+    type = "normal";
+  }
+
+  const types = {
+    normal: {
+      r: 13, hp: 1 + Math.floor(level / 5),
+      speed: 85, damage: 10, color: "#e84a5f"
+    },
+    fast: {
+      r: 10, hp: 1 + Math.floor(level / 6),
+      speed: 160, damage: 7, color: "#a78bfa"
+    },
+    tank: {
+      r: 20, hp: 4 + level,
+      speed: 45, damage: 18, color: "#f97316"
+    },
+    boss: {
+      r: 30, hp: 15 + level * 3,
+      speed: 60, damage: 25, color: "#dc2626"
+    }
+  };
+
+  const settings = types[type];
+
+  enemies.push({
+    x, y, type,
+    ...settings,
+    maxHp: settings.hp,
+    attackTimer: 2
+  });
+}
+
+function dropPowerup(x, y) {
+  if (Math.random() > 0.35) return;
+
+  const types = ["health", "rapid", "strong", "shield"];
+  const type = types[Math.floor(Math.random() * types.length)];
+
+  powerups.push({
+    x, y, type, r: 13, life: 12
+  });
+}
+
+function burst(x, y, color) {
+  for (let i = 0; i < 8; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const speed = 40 + Math.random() * 130;
+
+    particles.push({
+      x, y,
+      vx: Math.cos(a) * speed,
+      vy: Math.sin(a) * speed,
+      life: 0.35 + Math.random() * 0.3,
+      color
+    });
+  }
+}
+
+function shoot() {
+  const angle = Math.atan2(
+    mouse.y - player.y,
+    mouse.x - player.x
+  );
+
+  bullets.push({
+    x: player.x + Math.cos(angle) * 20,
+    y: player.y + Math.sin(angle) * 20,
+    vx: Math.cos(angle) * 600,
+    vy: Math.sin(angle) * 600,
+    r: 5,
+    life: 1.2,
+    damage: player.bulletDamage
+  });
+}
+
+function update(dt) {
+  if (!running) return;
+
+  // Player movement
+  let dx = 0;
+  let dy = 0;
+
+  if (keys.w || keys.arrowup) dy--;
+  if (keys.s || keys.arrowdown) dy++;
+  if (keys.a || keys.arrowleft) dx--;
+  if (keys.d || keys.arrowright) dx++;
+
+  const length = Math.hypot(dx, dy) || 1;
+
+  player.x += dx / length * player.speed * dt;
+  player.y += dy / length * player.speed * dt;
+
+  player.x = Math.max(
+    player.r,
+    Math.min(canvas.width - player.r, player.x)
+  );
+
+  player.y = Math.max(
+    player.r,
+    Math.min(canvas.height - player.r, player.y)
+  );
+
+  player.invincible = Math.max(0, player.invincible - dt);
+
+  // Power timers
+  for (const key in powerTimers) {
+    powerTimers[key] = Math.max(0, powerTimers[key] - dt);
+  }
+
+  player.bulletDamage = powerTimers.strong > 0 ? 3 : 1;
+
+  // Shooting
+  shootTimer -= dt;
+
+  if ((mouse.down || keys[" "]) && shootTimer <= 0) {
+    shoot();
+    shootTimer = powerTimers.rapid > 0 ? 0.07 : 0.22;
+  }
+
+  // Spawn enemies
+  spawnTimer -= dt;
+
+  if (spawnTimer <= 0) {
+    spawnEnemy();
+    spawnTimer = Math.max(0.3, 1.05 - level * 0.035);
+  }
+
+  // Move bullets
+  for (const b of bullets) {
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.life -= dt;
+  }
+
+  bullets = bullets.filter(b =>
+    b.life > 0 &&
+    b.x > -20 && b.x < canvas.width + 20 &&
+    b.y > -20 && b.y < canvas.height + 20
+  );
+
+  // Move enemies and apply contact damage
+  for (const e of enemies) {
+    const angle = Math.atan2(
+      player.y - e.y,
+      player.x - e.x
+    );
+
+    e.x += Math.cos(angle) * (e.speed + level * 2) * dt;
+    e.y += Math.sin(angle) * (e.speed + level * 2) * dt;
+
+    if (
+      Math.hypot(player.x - e.x, player.y - e.y) <
+      player.r + e.r
+    ) {
+      if (player.invincible <= 0 && powerTimers.shield <= 0) {
+        player.hp -= e.damage;
+        player.invincible = 0.65;
+        burst(player.x, player.y, "#ef4444");
+
+        if (player.hp <= 0) {
+          player.hp = 0;
+          endGame();
+          return;
+        }
+      }
+    }
+  }
+
+  // Bullet and enemy collisions
+  for (const b of bullets) {
+    for (const e of enemies) {
+      if (
+        e.hp > 0 &&
+        b.life > 0 &&
+        Math.hypot(b.x - e.x, b.y - e.y) < b.r + e.r
+      ) {
+        e.hp -= b.damage;
+        b.life = 0;
+        burst(b.x, b.y, "#fbbf24");
+
+        if (e.hp <= 0) {
+          score += e.type === "boss" ? 100 : 10;
+          kills++;
+          xp += e.type === "boss" ? 100 : 25;
+          dropPowerup(e.x, e.y);
+          burst(e.x, e.y, e.color);
+        }
+
+        break;
+      }
+    }
+  }
+
+  enemies = enemies.filter(e => e.hp > 0);
+  bullets = bullets.filter(b => b.life > 0);
+
+  // Power-up collection
+  for (const p of powerups) {
+    p.life -= dt;
+
+    if (
+      Math.hypot(player.x - p.x, player.y - p.y) <
+      player.r + p.r
+    ) {
+      if (p.type === "health") {
+        player.hp = Math.min(player.maxHp, player.hp + 35);
+      }
+
+      if (p.type === "rapid") {
+        powerTimers.rapid = 8;
+      }
+
+      if (p.type === "strong") {
+        powerTimers.strong = 10;
+      }
+
+      if (p.type === "shield") {
+        powerTimers.shield = 6;
+      }
+
+      burst(p.x, p.y, "#67e8f9");
+      p.life = 0;
+    }
+  }
+
+  powerups = powerups.filter(p => p.life > 0);
+
+  // Level up
+  while (xp >= nextXP) {
+    xp -= nextXP;
+    level++;
+    nextXP = Math.floor(nextXP * 1.35);
+    player.maxHp += 10;
+    player.hp = Math.min(player.maxHp, player.hp + 30);
+    player.speed += 4;
+  }
+
+  // Particles
+  for (const p of particles) {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+  }
+
+  particles = particles.filter(p => p.life > 0);
+
+  // Update HUD
+  document.getElementById("hpText").textContent =
+    Math.ceil(player.hp) + " / " + player.maxHp;
+
+  document.getElementById("health").style.width =
+    Math.max(0, player.hp / player.maxHp * 100) + "%";
+
+  document.getElementById("xp").style.width =
+    xp / nextXP * 100 + "%";
+
+  document.getElementById("level").textContent = level;
+  document.getElementById("score").textContent = score;
+  document.getElementById("kills").textContent = kills;
+
+  const active = [];
+
+  if (powerTimers.rapid > 0)
+    active.push("Rapid Fire " + powerTimers.rapid.toFixed(1) + "s");
+
+  if (powerTimers.strong > 0)
+    active.push("Strong Bullets " + powerTimers.strong.toFixed(1) + "s");
+
+  if (powerTimers.shield > 0)
+    active.push("Shield " + powerTimers.shield.toFixed(1) + "s");
+
+  document.getElementById("powers").textContent =
+    "Active powers: " + (active.join(", ") || "None");
+
+  // Boss health display
+  const boss = enemies.find(e => e.type === "boss");
+  const bossBar = document.getElementById("bossBar");
+
+  bossBar.style.display = boss ? "block" : "none";
+
+  if (boss) {
+    document.getElementById("bossHealth").style.width =
+      Math.max(0, boss.hp / boss.maxHp * 100) + "%";
+  }
+}
+
+function draw() {
+  ctx.fillStyle = "#10151d";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Arena grid
+  ctx.strokeStyle = "#1d2936";
+  ctx.lineWidth = 1;
+
+  for (let x = 0; x < canvas.width; x += 40) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+
+  for (let y = 0; y < canvas.height; y += 40) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+
+  // Power-ups
+  const colors = {
+    health: "#22c55e",
+    rapid: "#facc15",
+    strong: "#38bdf8",
+    shield: "#c084fc"
+  };
+
+  const icons = {
+    health: "+",
+    rapid: "⚡",
+    strong: "3x",
+    shield: "S"
+  };
+
+  for (const p of powerups) {
+    ctx.fillStyle = colors[p.type];
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = colors[p.type];
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#10151d";
+    ctx.font = "bold 13px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(icons[p.type], p.x, p.y);
+  }
+
+  // Bullets
+  for (const b of bullets) {
+    ctx.fillStyle = powerTimers.strong > 0 ? "#38bdf8" : "#fde047";
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = ctx.fillStyle;
+
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.shadowBlur = 0;
+
+  // Enemies
+  for (const e of enemies) {
+    ctx.fillStyle = e.color;
+
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(e.x - e.r * 0.3, e.y - 3, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(e.x + e.r * 0.3, e.y - 3, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (e.type === "boss" || e.type === "tank") {
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(e.x - e.r, e.y - e.r - 9, e.r * 2, 4);
+
+      ctx.fillStyle = "#4ade80";
+      ctx.fillRect(
+        e.x - e.r,
+        e.y - e.r - 9,
+        e.r * 2 * Math.max(0, e.hp / e.maxHp),
+        4
+      );
+    }
+  }
+
+  // Player and weapon
+  if (player) {
+    const angle = Math.atan2(
+      mouse.y - player.y,
+      mouse.x - player.x
+    );
+
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(angle);
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillRect(3, -5, 27, 10);
+
+    ctx.restore();
+
+    if (powerTimers.shield > 0) {
+      ctx.strokeStyle = "#c084fc";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.r + 7, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = player.invincible > 0 ? "#ffffff" : "#22d3ee";
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = "#22d3ee";
+
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+  }
+
+  // Particles
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2));
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, 4, 4);
+  }
+
+  ctx.globalAlpha = 1;
+}
+
+function endGame() {
+  running = false;
+
+  document.getElementById("result").textContent = "GAME OVER";
+
+  document.getElementById("summary").textContent =
+    `Level ${level} · Score ${score} · Enemies defeated ${kills}`;
+
+  document.getElementById("overlay").style.display = "flex";
+  document.getElementById("bossBar").style.display = "none";
+}
+
+function loop(time) {
+  const dt = Math.min((time - lastTime) / 1000, 0.035);
+  lastTime = time;
+
+  update(dt);
+  draw();
+
+  requestAnimationFrame(loop);
+}
+
+restart();
+requestAnimationFrame(loop);
+</script>
+
+</body>
+</html>
